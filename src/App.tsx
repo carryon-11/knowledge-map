@@ -26,6 +26,7 @@ import { ConfirmModal } from "./components/ConfirmModal";
 import { ImportModal } from "./components/ImportModal";
 import { SearchBar } from "./components/SearchBar";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { getVersion } from "@tauri-apps/api/app";
 
 function App() {
   const [nodes, setNodes] = useState<NodeRow[]>([]);
@@ -40,6 +41,12 @@ function App() {
   const [dragging, setDragging] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ paths: string[]; nodeId: string } | null>(null);
   const [dropWarning, setDropWarning] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
+
+  // 앱 버전 표시(상단바). 업데이트 후 버전이 바뀌는 걸 눈으로 확인할 수 있다.
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   // drag-drop 콜백이 최신 선택값을 읽도록 ref 로 유지(리스너는 1회만 등록).
   const selectedIdRef = useRef<string | null>(null);
@@ -292,7 +299,7 @@ function App() {
     <div className="app-shell">
       <UpdateBanner />
       <header className="topbar">
-        <div className="brand">knowledge-map</div>
+        <div className="brand">knowledge-map{appVersion ? ` v${appVersion}` : ""}</div>
         <SearchBar onJump={handleJump} />
       </header>
 

@@ -1,0 +1,31 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 사용자 첨부 원본 (storage) — 실제 첨부 파일은 버전관리 제외.
+# 폴더 구조와 플레이스홀더(README.md, .gitkeep)는 유지한다.
+/src-tauri/storage/**
+!/src-tauri/storage/README.md
+!/src-tauri/storage/.trash/
+!/src-tauri/storage/.trash/.gitkeep

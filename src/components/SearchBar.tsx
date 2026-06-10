@@ -12,7 +12,8 @@ export function SearchBar({ onJump }: SearchBarProps) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  // 디바운스 검색
+  // 디바운스 검색. cancelled 가드: 이미 발사된 이전 검색이 늦게 도착해
+  // 최신 결과를 덮어쓰는 역전(race)을 방지한다.
   useEffect(() => {
     const term = q.trim();
     if (!term) {
@@ -20,16 +21,22 @@ export function SearchBar({ onJump }: SearchBarProps) {
       setOpen(false);
       return;
     }
+    let cancelled = false;
     const t = setTimeout(async () => {
       try {
         const r = await search(term);
-        setResults(r);
-        setOpen(true);
+        if (!cancelled) {
+          setResults(r);
+          setOpen(true);
+        }
       } catch (e) {
         console.error("검색 실패:", e);
       }
     }, 180);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [q]);
 
   // 바깥 클릭 시 닫기

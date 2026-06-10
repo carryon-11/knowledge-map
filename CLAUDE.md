@@ -24,11 +24,17 @@ Tauri v2 + Vite + React + TypeScript + SQLite(tauri-plugin-sql). 데스크톱, �
 - 스키마 임의 변경 금지.
 - 첨부 모델을 노드 모델로 바꾸지 말 것.
 
-## 빌드 순서
-0. 스캐폴딩 + DB
-1. UI 골격 + 트리 ← (지금)
-2. 드래그앤드롭 첨부 + 유형 드롭다운 + 휴지통 삭제
-3. 태그 + 메모
-4. 검색 (FTS5)
-5. 파서 어댑터 (PDF/HWPX 추출, HWP/PPT 외부 열기)
-6. (후순위) 맵 뷰
+## 빌드 순서 (0–5 완료 = MVP 코어 동작)
+0. 스캐폴딩 + DB ✅
+1. UI 골격 + 트리 ✅
+2. 드래그앤드롭 첨부 + 유형 드롭다운 + 휴지통 삭제 ✅
+3. 태그 + 메모 ✅
+4. 검색 (FTS5 trigram, 한글 부분검색) ✅
+5. 파서 어댑터 (PDF/HWPX 추출, HWP/PPT 외부 열기) ✅
+6. (후순위) 맵 뷰 ← 다음
+
+## 배포 / 자동 업데이트
+- GitHub: https://github.com/carryon-11/knowledge-map (public). 태그 푸시 시 GitHub Actions 가 빌드·서명·릴리스(MSI + latest.json) 자동 생성.
+- 새 버전 절차: `src-tauri/tauri.conf.json` 의 version ↑ → commit/push → `git tag vX.Y.Z && git push origin vX.Y.Z`.
+- 설치본은 시작 시 latest.json 을 확인해 자동 업데이트. 서명 비밀키(`%USERPROFILE%\.tauri\knowledge-map.key` + 암호 파일)는 분실 금지(분실 시 기존 설치본 업데이트 불가).
+- 마이그레이션은 append-only — 이미 적용된 마이그레이션 파일 수정 금지(sqlx 체크섬 불일치로 기존 DB 가 깨짐). 변경은 항상 새 번호로.

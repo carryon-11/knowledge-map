@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FILE_TYPES, guessFileType, type FileType } from "../db";
 
 function basename(p: string): string {
@@ -11,15 +11,34 @@ interface ImportModalProps {
   onCancel: () => void;
 }
 
-/** 드롭한 파일들의 유형을 확인/선택해 등록하는 모달. */
+/**
+ * 드롭한 파일들의 유형을 확인/선택해 등록하는 모달.
+ * 유형 상태는 경로 키 Record 로 관리 — 모달이 열린 채 파일을 추가로 드롭해
+ * paths 가 바뀌어도(병합) 기존 선택을 잃지 않고 새 항목만 기본값으로 채운다.
+ */
 export function ImportModal({ paths, onConfirm, onCancel }: ImportModalProps) {
-  const [types, setTypes] = useState<FileType[]>(() => paths.map(guessFileType));
+  const [types, setTypes] = useState<Record<string, FileType>>(() =>
+    Object.fromEntries(paths.map((p) => [p, guessFileType(p)])),
+  );
   const [busy, setBusy] = useState(false);
+
+  // paths 가 바뀌면(추가 드롭 병합) 새 경로만 기본값으로 보충한다.
+  useEffect(() => {
+    setTypes((prev) => {
+      const next = { ...prev };
+      for (const p of paths) {
+        if (!(p in next)) next[p] = guessFileType(p);
+      }
+      return next;
+    });
+  }, [paths]);
 
   async function confirm() {
     setBusy(true);
     try {
-      await onConfirm(paths.map((p, i) => ({ path: p, fileType: types[i] })));
+      await onConfirm(
+        paths.map((p) => ({ path: p, fileType: types[p] ?? guessFileType(p) })),
+      );
     } finally {
       setBusy(false);
     }
@@ -36,19 +55,15 @@ export function ImportModal({ paths, onConfirm, onCancel }: ImportModalProps) {
         <h3>첨부 등록 ({paths.length})</h3>
         <p>파일 유형을 확인하고 등록하세요. 확장자로 기본값이 추정됩니다.</p>
         <ul className="import-list">
-          {paths.map((p, i) => (
-            <li className="import-row" key={p + i}>
+          {paths.map((p) => (
+            <li className="import-row" key={p}>
               <span className="import-name" title={p}>
                 {basename(p)}
               </span>
               <select
-                value={types[i]}
+                value={types[p] ?? guessFileType(p)}
                 onChange={(e) =>
-                  setTypes((prev) => {
-                    const next = [...prev];
-                    next[i] = e.target.value as FileType;
-                    return next;
-                  })
+                  setTypes((prev) => ({ ...prev, [p]: e.target.value as FileType }))
                 }
               >
                 {FILE_TYPES.map((t) => (

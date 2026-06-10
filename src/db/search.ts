@@ -74,19 +74,20 @@ export async function search(query: string): Promise<SearchResult[]> {
     return rows.map(toResult);
   }
 
-  // 2글자 이하: base 컬럼 LIKE 폴백
-  const like = "%" + q + "%";
+  // 2글자 이하: base 컬럼 LIKE 폴백. %/_ 는 LIKE 와일드카드라 이스케이프해
+  // 리터럴로 매칭한다(예: "5%" 검색이 "5로 시작하는 전부"가 되지 않게).
+  const like = "%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%";
   const rows = await db.select<RawRow[]>(
     `SELECT id AS ref_id, 'node' AS kind, NULL AS snip,
             title AS node_title, NULL AS file_name, NULL AS file_node_id, NULL AS file_type
        FROM nodes
-      WHERE (COALESCE(title,'')||' '||COALESCE(description,'')||' '||COALESCE(content,'')||' '||COALESCE(memo,'')) LIKE $1
+      WHERE (COALESCE(title,'')||' '||COALESCE(description,'')||' '||COALESCE(content,'')||' '||COALESCE(memo,'')) LIKE $1 ESCAPE '\\'
      UNION ALL
      SELECT id AS ref_id, 'file' AS kind, NULL AS snip,
             NULL AS node_title, original_name AS file_name, node_id AS file_node_id, file_type AS file_type
        FROM files
       WHERE deleted_at IS NULL
-        AND (COALESCE(original_name,'')||' '||COALESCE(extracted_text,'')) LIKE $2
+        AND (COALESCE(original_name,'')||' '||COALESCE(extracted_text,'')) LIKE $2 ESCAPE '\\'
       LIMIT 50`,
     [like, like],
   );

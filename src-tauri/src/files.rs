@@ -1,4 +1,7 @@
 // H2: 파일 첨부 — 복사/해시/휴지통 이동/열기. DB 는 건드리지 않는다(JS 가 sql 플러그인으로 기록).
+//
+// 모든 커맨드는 async: 동기 커맨드는 메인 스레드에서 실행되어(공식 문서) 큰 파일
+// 복사/해시 동안 UI 가 얼어붙는다. async 커맨드는 별도 태스크에서 실행된다.
 
 use std::fs;
 use std::path::PathBuf;
@@ -20,6 +23,16 @@ pub struct FileMeta {
     file_path: String,
 }
 
+/// storage 내부 파일명 검증: 경로 구분자/상위 이동(`..`) 금지.
+/// 우리가 만드는 값은 항상 `{uuid}.{ext}` 평면 파일명이므로, 그 외 형태는 거부해
+/// storage 밖 파일을 열거나 옮기는 경로 탈출을 차단한다(방어적).
+pub(crate) fn validate_storage_name(name: &str) -> Result<(), String> {
+    if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err("잘못된 storage 파일명입니다.".into());
+    }
+    Ok(())
+}
+
 /// storage 베이스(`<appLocalData>/storage`)를 보장하고 반환. `.trash` 도 함께 생성한다.
 fn storage_base() -> Result<PathBuf, String> {
     let base = app_data_dir()?.join("storage");
@@ -29,8 +42,11 @@ fn storage_base() -> Result<PathBuf, String> {
 }
 
 /// 소스 파일을 `storage/{dest_id}.{ext}` 로 복사하고 메타데이터를 반환한다.
+/// (source_path 는 사용자가 드롭한 임의 경로 — 검증 대상은 dest_id 쪽이다.)
 #[tauri::command]
-pub fn import_file(source_path: String, dest_id: String) -> Result<FileMeta, String> {
+pub async fn import_file(source_path: String, dest_id: String) -> Result<FileMeta, String> {
+    validate_storage_name(&dest_id)?;
+
     let src = PathBuf::from(&source_path);
     if !src.is_file() {
         return Err(format!("소스 파일을 찾을 수 없습니다: {source_path}"));
@@ -50,6 +66,7 @@ pub fn import_file(source_path: String, dest_id: String) -> Result<FileMeta, Str
     let dest = base.join(&stored_name);
 
     // 원본을 한 번 읽어 그대로 저장 + 동일 바이트로 해시.
+    // (메모리에 통째로 올리므로 수 GB 급 파일에는 부적합 — 문서 첨부 용도 전제)
     let bytes = fs::read(&src).map_err(|e| format!("읽기 실패: {e}"))?;
     fs::write(&dest, &bytes).map_err(|e| format!("저장 실패: {e}"))?;
 
@@ -73,7 +90,8 @@ pub fn import_file(source_path: String, dest_id: String) -> Result<FileMeta, Str
 
 /// 첨부 원본을 `storage/.trash/` 로 이동(soft-delete 의 물리 처리). 하드 삭제하지 않는다.
 #[tauri::command]
-pub fn trash_attachment(file_path: String) -> Result<(), String> {
+pub async fn trash_attachment(file_path: String) -> Result<(), String> {
+    validate_storage_name(&file_path)?;
     let base = storage_base()?;
     let src = base.join(&file_path);
     if !src.exists() {
@@ -89,7 +107,11 @@ pub fn trash_attachment(file_path: String) -> Result<(), String> {
 
 /// 첨부 원본을 OS 기본 프로그램으로 연다(opener 플러그인의 Rust API 사용 → JS 권한 스코프 불필요).
 #[tauri::command]
-pub fn open_attachment<R: Runtime>(app: AppHandle<R>, file_path: String) -> Result<(), String> {
+pub async fn open_attachment<R: Runtime>(
+    app: AppHandle<R>,
+    file_path: String,
+) -> Result<(), String> {
+    validate_storage_name(&file_path)?;
     let base = storage_base()?;
     let abs = base.join(&file_path);
     if !abs.exists() {

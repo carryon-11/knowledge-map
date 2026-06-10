@@ -143,7 +143,17 @@ function App() {
               setTimeout(() => setDropWarning(false), 2500);
               return;
             }
-            setPendingImport({ paths, nodeId });
+            // 모달이 열린 채 또 드롭하면 첫 배치를 잃지 않도록 병합한다(중복 경로 제거).
+            setPendingImport((prev) => {
+              if (prev && prev.nodeId === nodeId) {
+                const merged = [
+                  ...prev.paths,
+                  ...paths.filter((p) => !prev.paths.includes(p)),
+                ];
+                return { paths: merged, nodeId };
+              }
+              return { paths, nodeId };
+            });
           } else if (p.type === "leave") {
             setDragging(false);
           } else {
@@ -245,9 +255,14 @@ function App() {
 
       const inserted: { id: string; fileType: FileType; filePath: string }[] = [];
       for (const it of items) {
-        const meta = await importFile(it.path);
-        const id = await insertFile(meta, target, it.fileType);
-        inserted.push({ id, fileType: it.fileType, filePath: meta.file_path });
+        try {
+          const meta = await importFile(it.path);
+          const id = await insertFile(meta, target, it.fileType);
+          inserted.push({ id, fileType: it.fileType, filePath: meta.file_path });
+        } catch (e) {
+          // 한 파일이 실패해도(이동/잠김 등) 나머지는 계속 등록한다.
+          console.error("첨부 등록 실패:", it.path, e);
+        }
       }
       refreshAttachmentsIfCurrent(target);
 
